@@ -1,6 +1,6 @@
--- Brainrot Rush 3D: the RemoteEvents the client and server use.
--- All gameplay actions go through these; the server validates every
--- one, so the client can never grant itself cash or a character.
+-- Brainrot Rush 3D: the RemoteEvents the client and server share.
+-- Every gameplay action goes through these, and the server validates
+-- each one, so the client can never grant itself cash or a character.
 
 local Remotes = {}
 

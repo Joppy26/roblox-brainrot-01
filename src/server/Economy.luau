@@ -1,7 +1,8 @@
 -- Brainrot Rush 3D: money, bases and rebirth. The server owns every
--- number: cash and income live in leaderstats, buying and rebirth go
+-- number. Cash and income live in leaderstats, buying and rebirth go
 -- through RemoteEvents with server-side validation, and the income
--- tick runs on the server once a second.
+-- tick runs on the server once a second. A buy is only valid when
+-- the player is actually standing near the character they clicked.
 
 local Config = require(script.Parent.Config)
 local Characters = require(script.Parent.Characters)
@@ -25,6 +26,14 @@ function Economy.getData(player)
 	return Economy.data[player]
 end
 
+local function rootOf(player)
+	local character = player.Character
+	if not character then
+		return nil
+	end
+	return character:FindFirstChild("HumanoidRootPart")
+end
+
 -- Keep the base sign honest: owner name and current income per second.
 function Economy.updateSign(base)
 	if not base or not base.sign then
@@ -40,14 +49,14 @@ function Economy.updateSign(base)
 	end
 	if base.owner then
 		local rate = Characters.totalRate(base.owner, Economy.rebirthMult(base.owner))
-		label.Text = base.owner.Name .. "\n$" .. math.floor(rate) .. "/s"
+		label.Text = base.owner.Name .. "\n" .. Config.formatCash(rate) .. "/s"
 	else
 		label.Text = "BASE\nEmpty"
 	end
 end
 
 function Economy.assignBase(player)
-	for i, base in ipairs(Economy.bases) do
+	for _, base in ipairs(Economy.bases) do
 		if base.owner == nil then
 			base.owner = player
 			Economy.updateSign(base)
@@ -130,8 +139,9 @@ local function tell(player, text)
 end
 
 -- Buying: the character must still be on the conveyor, the player
--- must have a base with a free pad and enough cash. The mutation is
--- rolled here, on the server, and the billboard is updated to match.
+-- must be standing near it, and must have a base with a free pad
+-- and enough cash. The mutation is rolled here, on the server, and
+-- the billboard rate line is updated to match.
 local function onBuy(player, charId)
 	local d = Economy.data[player]
 	if not d or not d.base then
@@ -143,8 +153,16 @@ local function onBuy(player, charId)
 		tell(player, "That brainrot is gone.")
 		return
 	end
+	local hrp = rootOf(player)
+	if not hrp then
+		return
+	end
+	if (record.root.Position - hrp.Position).Magnitude > Config.BUY_RANGE then
+		tell(player, "Too far away to buy " .. record.def.name .. ". Get closer to the conveyor.")
+		return
+	end
 	if cashOf(player) < record.def.price then
-		tell(player, "Not enough cash for " .. record.def.name .. ".")
+		tell(player, "Not enough cash for " .. record.def.name .. ". It costs " .. Config.formatCash(record.def.price) .. ".")
 		return
 	end
 	local padIndex = freePad(d.base)
@@ -156,22 +174,16 @@ local function onBuy(player, charId)
 	record.mutation = Config.rollMutation()
 	record.owner = player
 	Characters.placeOnPad(record, d.base, padIndex)
-	-- Refresh the rate line on the billboard.
+	-- Refresh the rate line on the billboard, found by its name.
 	local gui = record.root:FindFirstChild("Label")
 	if gui then
-		local rateLabel = gui:FindFirstChild("TextLabel")
-		-- The rate label is the third child; find it by its text colour.
-		for _, child in ipairs(gui:GetChildren()) do
-			if child:IsA("TextLabel") and child.TextColor3 == Color3.fromRGB(120, 255, 120) then
-				rateLabel = child
-			end
-		end
+		local rateLabel = gui:FindFirstChild("RateLabel")
 		if rateLabel then
 			local rate = record.def.rate * record.mutation.mult
 			if record.mutation.name ~= "" then
-				rateLabel.Text = record.mutation.name .. " $" .. rate .. "/s"
+				rateLabel.Text = record.mutation.name .. " " .. Config.formatCash(rate) .. "/s"
 			else
-				rateLabel.Text = "$" .. rate .. "/s"
+				rateLabel.Text = Config.formatCash(rate) .. "/s"
 			end
 		end
 	end
@@ -192,7 +204,7 @@ local function onRebirth(player)
 	end
 	local rate = Characters.totalRate(player, Economy.rebirthMult(player))
 	if rate < Config.REBIRTH_INCOME_NEEDED then
-		tell(player, "Rebirth needs $" .. Config.REBIRTH_INCOME_NEEDED .. "/s income. You have $" .. math.floor(rate) .. "/s.")
+		tell(player, "Rebirth needs " .. Config.formatCash(Config.REBIRTH_INCOME_NEEDED) .. "/s income. You have " .. Config.formatCash(rate) .. "/s.")
 		return
 	end
 	for i = #Characters.active, 1, -1 do

@@ -2,6 +2,8 @@
 -- character from another player's base and carry it home, slower than
 -- normal, while the victim gets an alert. A slap from the Slap tool
 -- knocks the carrier down and drops the character back on its pad.
+-- A steal only counts when the thief is standing next to the victim's
+-- character, so a RemoteEvent from across the map buys nothing.
 
 local Config = require(script.Parent.Config)
 local Characters = require(script.Parent.Characters)
@@ -103,6 +105,10 @@ local function onSteal(player, charId)
 	end
 	local hrp = rootOf(player)
 	if not hrp then
+		return
+	end
+	if (record.root.Position - hrp.Position).Magnitude > Config.STEAL_RANGE then
+		tell(player, "Too far away to steal " .. record.def.name .. ". Sneak right up to it first.")
 		return
 	end
 	-- Carry it: weld the character above the player's head and slow

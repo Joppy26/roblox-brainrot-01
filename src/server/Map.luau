@@ -1,11 +1,15 @@
--- Brainrot Rush 3D: builds the whole arena from Parts.
+-- Brainrot Rush 3D: builds the whole arena out of Parts.
 -- A green baseplate, a central conveyor lane, four corner bases with
 -- spawn points, a shop strip of rarity-coloured stalls, a welcome
 -- sign and a few trees. No free models, no meshes, no decals.
+-- Every sign faces the arena centre, so its text is readable from
+-- where the players actually stand.
 
 local Config = require(script.Parent.Config)
 
 local Map = {}
+
+local ARENA_CENTRE = Vector3.new(0, 0, 0)
 
 local function part(parent, name, size, color, pos, material)
 	local p = Instance.new("Part")
@@ -22,8 +26,14 @@ local function part(parent, name, size, color, pos, material)
 	return p
 end
 
-local function sign(parent, name, pos, size, text, textColor, bgColor)
+-- A wooden board with a SurfaceGui on its Front face. facing is the
+-- point the text should look at: CFrame.lookAt turns the part's
+-- Front (-Z) face toward it, so the sign reads from that direction.
+local function sign(parent, name, pos, size, text, textColor, bgColor, facing)
 	local board = part(parent, name, size, bgColor, pos, Enum.Material.Wood)
+	local target = facing or ARENA_CENTRE
+	-- Keep the board upright: look at the target at the board's height.
+	board.CFrame = CFrame.lookAt(pos, Vector3.new(target.X, pos.Y, target.Z))
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = Enum.NormalId.Front
 	gui.AlwaysOnTop = false
@@ -40,7 +50,7 @@ local function sign(parent, name, pos, size, text, textColor, bgColor)
 end
 
 -- Four corner bases. Returns a list of base tables:
--- { center = Vector3, pads = {Vector3}, sign = Part, spawn = SpawnLocation, owner = nil }
+-- { center, pads, sign, spawn, owner, color }
 function Map.buildBases(workspace)
 	local bases = {}
 	local corners = {
@@ -63,10 +73,11 @@ function Map.buildBases(workspace)
 		-- Raised platform with a coloured rim.
 		part(folder, "Platform", Vector3.new(26, 1, 26), Color3.fromRGB(240, 235, 220), corner + Vector3.new(0, 0.5, 0))
 		part(folder, "Rim", Vector3.new(28, 0.4, 28), colors[i], corner + Vector3.new(0, 0.2, 0))
-		-- The sign post faces the middle of the arena.
+
+		-- The sign post stands at the base and faces the arena centre,
+		-- so a player walking in from the lane can read it.
 		local signPos = corner + Vector3.new(0, 4, 0)
-		local board = sign(folder, "BaseSign", signPos, Vector3.new(16, 5, 0.6), "BASE " .. i .. "\nEmpty", Color3.fromRGB(255, 255, 255), colors[i])
-		board.Orientation = Vector3.new(0, 0, 0)
+		local board = sign(folder, "BaseSign", signPos, Vector3.new(16, 5, 0.6), "BASE " .. i .. "\nEmpty", Color3.fromRGB(255, 255, 255), colors[i], ARENA_CENTRE)
 
 		-- Six pads in two rows of three.
 		local pads = {}
@@ -119,14 +130,16 @@ function Map.buildLane(workspace)
 		chevron.Orientation = Vector3.new(0, 45, 0)
 		chevron.CanCollide = false
 	end
-	-- Start and end gates.
-	sign(lane, "StartGate", Vector3.new(-76, 5, 0), Vector3.new(1, 8, 12), "IN", Color3.fromRGB(255, 255, 255), Color3.fromRGB(60, 180, 80))
-	sign(lane, "EndGate", Vector3.new(76, 5, 0), Vector3.new(1, 8, 12), "OUT", Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 60, 60))
+	-- Start gate faces east, down the lane; end gate faces west, back
+	-- up it. Both read from the middle of the arena.
+	sign(lane, "StartGate", Vector3.new(-76, 5, 0), Vector3.new(1, 8, 12), "IN", Color3.fromRGB(255, 255, 255), Color3.fromRGB(60, 180, 80), Vector3.new(0, 5, 0))
+	sign(lane, "EndGate", Vector3.new(76, 5, 0), Vector3.new(1, 8, 12), "OUT", Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 60, 60), Vector3.new(0, 5, 0))
 	return lane
 end
 
 -- Shop stalls along the north edge, one per rarity, so the lane reads
--- as a market and new players learn the ladder at a glance.
+-- as a market and new players learn the ladder at a glance. Stall
+-- signs face south, into the arena.
 function Map.buildShops(workspace)
 	local shops = Instance.new("Folder")
 	shops.Name = "Shops"
@@ -140,7 +153,7 @@ function Map.buildShops(workspace)
 		part(stall, "Awning", Vector3.new(13, 0.5, 6), rarity.color, Vector3.new(x, 6, -86))
 		part(stall, "PostLeft", Vector3.new(0.6, 6, 0.6), Color3.fromRGB(120, 90, 60), Vector3.new(x - 6, 3, -86), Enum.Material.Wood)
 		part(stall, "PostRight", Vector3.new(0.6, 6, 0.6), Color3.fromRGB(120, 90, 60), Vector3.new(x + 6, 3, -86), Enum.Material.Wood)
-		sign(stall, "StallSign", Vector3.new(x, 8.5, -86), Vector3.new(12, 3, 0.6), rarity.name, Color3.fromRGB(255, 255, 255), rarity.color)
+		sign(stall, "StallSign", Vector3.new(x, 8.5, -86), Vector3.new(12, 3, 0.6), rarity.name, Color3.fromRGB(255, 255, 255), rarity.color, ARENA_CENTRE)
 	end
 	return shops
 end
@@ -190,8 +203,9 @@ function Map.buildAll(workspace)
 	Map.buildShops(workspace)
 	Map.buildTrees(workspace)
 
-	-- Welcome sign over the middle of the north side.
-	sign(workspace, "WelcomeSign", Vector3.new(0, 10, -92), Vector3.new(40, 6, 1), "BRAINROT RUSH 3D", Color3.fromRGB(255, 255, 255), Color3.fromRGB(220, 40, 60))
+	-- Welcome sign over the middle of the north side, facing south
+	-- into the arena.
+	sign(workspace, "WelcomeSign", Vector3.new(0, 10, -92), Vector3.new(40, 6, 1), "BRAINROT RUSH 3D", Color3.fromRGB(255, 255, 255), Color3.fromRGB(220, 40, 60), ARENA_CENTRE)
 
 	return bases
 end

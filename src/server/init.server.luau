@@ -1,6 +1,7 @@
 -- Brainrot Rush 3D: server entry point.
 -- Builds the arena, starts the conveyor, wires the economy, stealing
 -- and the Brainrot Wave, and hands every player a base and a Slap tool.
+-- Roblox seeds math.random on its own; no manual seeding here.
 
 local Players = game:GetService("Players")
 
@@ -12,20 +13,15 @@ local Remotes = require(script.Parent.Remotes)
 local Stealing = require(script.Parent.Stealing)
 local Wave = require(script.Parent.Wave)
 
-math.randomseed(os.time())
-
 local workspace = game:GetService("Workspace")
 local bases = Map.buildAll(workspace)
 local remotes = Remotes.create()
 
-Characters.init(workspace)
-Economy.init(remotes, bases)
-Stealing.init(remotes)
-Wave.init(remotes)
-
 -- Clicking a character is how you buy and steal: on the conveyor it
 -- is a purchase, on another player's base it is a steal attempt.
-Characters.onSpawned = function(record)
+-- The click handler is handed to Characters as a callback, so no
+-- module reaches into another module's mutable state.
+local function onCharacterSpawned(record)
 	local click = record.root:FindFirstChildOfClass("ClickDetector")
 	if not click then
 		return
@@ -38,6 +34,11 @@ Characters.onSpawned = function(record)
 		end
 	end)
 end
+
+Characters.init(workspace, onCharacterSpawned)
+Economy.init(remotes, bases)
+Stealing.init(remotes)
+Wave.init(remotes)
 
 Players.PlayerAdded:Connect(function(player)
 	Economy.onPlayerAdded(player)

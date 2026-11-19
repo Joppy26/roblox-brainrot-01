@@ -1,7 +1,8 @@
--- Brainrot Rush 3D: the cast. Every character is built from Parts in
--- code, so the whole cast lives in src/ and the place is fully
--- reproducible. Characters walk the conveyor, show a billboard with
--- name, rarity and $/s, and can be bought, stolen or carried.
+-- Brainrot Rush 3D: the cast. Every character is assembled from Parts
+-- in code, so the whole cast lives in src/ and the place is fully
+-- reproducible from the repo. Characters walk the conveyor, wear a
+-- billboard with name, rarity and $/s, and can be bought, stolen or
+-- carried home.
 
 local Config = require(script.Parent.Config)
 
@@ -10,6 +11,7 @@ Characters.active = {}
 Characters.nextId = 0
 
 local folder = nil
+local onSpawned = nil
 
 local function addPart(model, root, name, size, color, offset, shape)
 	local p = Instance.new("Part")
@@ -51,7 +53,7 @@ local function addWedge(model, root, name, size, color, offset)
 end
 
 -- One builder per character. Each takes (model, root) and adds parts
--- relative to the root, which sits at ground level.
+-- relative to the root, which sits at ground level under the model.
 local Builders = {}
 
 function Builders.TungTung(model, root)
@@ -149,15 +151,20 @@ end
 
 -- The floating label every character wears: name, rarity colour,
 -- mutation and money per second, readable from across the arena.
+-- The three lines are named, so other modules can find the rate
+-- line by name instead of guessing by colour.
+-- The offset sits above the tallest model (Lirili tops out near
+-- 5.4 studs), so the label never clips into a head.
 local function buildBillboard(model, root, def, mutation)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Label"
 	gui.Size = UDim2.new(0, 140, 0, 64)
-	gui.StudsOffsetWorldSpace = Vector3.new(0, 4.5, 0)
+	gui.StudsOffsetWorldSpace = Vector3.new(0, 5.8, 0)
 	gui.AlwaysOnTop = true
 	gui.Parent = root
 
 	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Name = "NameLabel"
 	nameLabel.Size = UDim2.new(1, 0, 0, 22)
 	nameLabel.BackgroundTransparency = 0.3
 	nameLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -168,6 +175,7 @@ local function buildBillboard(model, root, def, mutation)
 	nameLabel.Parent = gui
 
 	local rarityLabel = Instance.new("TextLabel")
+	rarityLabel.Name = "RarityLabel"
 	rarityLabel.Position = UDim2.new(0, 0, 0, 22)
 	rarityLabel.Size = UDim2.new(1, 0, 0, 20)
 	rarityLabel.BackgroundTransparency = 0.3
@@ -178,11 +186,12 @@ local function buildBillboard(model, root, def, mutation)
 	rarityLabel.Font = Enum.Font.FredokaOne
 	rarityLabel.Parent = gui
 
-	local rateText = "$" .. def.rate .. "/s"
+	local rateText = Config.formatCash(def.rate) .. "/s"
 	if mutation.name ~= "" then
-		rateText = mutation.name .. " $" .. def.rate * mutation.mult .. "/s"
+		rateText = mutation.name .. " " .. Config.formatCash(def.rate * mutation.mult) .. "/s"
 	end
 	local rateLabel = Instance.new("TextLabel")
+	rateLabel.Name = "RateLabel"
 	rateLabel.Position = UDim2.new(0, 0, 0, 42)
 	rateLabel.Size = UDim2.new(1, 0, 0, 20)
 	rateLabel.BackgroundTransparency = 0.3
@@ -196,10 +205,23 @@ local function buildBillboard(model, root, def, mutation)
 	return gui
 end
 
-function Characters.init(workspace)
+-- init takes the spawn callback as an argument, so no module ever
+-- writes to a shared mutable slot to wire up click handling.
+function Characters.init(workspace, spawnedCallback)
 	folder = Instance.new("Folder")
 	folder.Name = "Brainrots"
 	folder.Parent = workspace
+	onSpawned = spawnedCallback
+end
+
+function Characters.conveyorCount()
+	local count = 0
+	for _, record in ipairs(Characters.active) do
+		if record.state == "conveyor" then
+			count += 1
+		end
+	end
+	return count
 end
 
 function Characters.spawnOne()
@@ -242,8 +264,8 @@ function Characters.spawnOne()
 		x = Config.LANE_START_X,
 	}
 	table.insert(Characters.active, record)
-	if Characters.onSpawned then
-		Characters.onSpawned(record)
+	if onSpawned then
+		onSpawned(record)
 	end
 	return record
 end
@@ -326,11 +348,14 @@ function Characters.startConveyor()
 	end)
 end
 
--- A steady trickle of new characters onto the lane.
+-- A steady trickle of new characters onto the lane, capped so the
+-- conveyor never floods the map with models.
 function Characters.startSpawning()
 	task.spawn(function()
 		while true do
-			Characters.spawnOne()
+			if Characters.conveyorCount() < Config.MAX_CONVEYOR then
+				Characters.spawnOne()
+			end
 			task.wait(Config.SPAWN_INTERVAL)
 		end
 	end)

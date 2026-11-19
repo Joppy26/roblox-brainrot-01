@@ -87,14 +87,25 @@ waveLabel.Font = Enum.Font.FredokaOne
 waveLabel.Visible = false
 waveLabel.Parent = gui
 
+local function formatCash(amount)
+	local n = math.floor(amount)
+	local text = tostring(n)
+	local out = ""
+	while #text > 3 do
+		out = "," .. text:sub(-3) .. out
+		text = text:sub(1, -4)
+	end
+	return "$" .. text .. out
+end
+
 local function bindStats()
 	local stats = player:WaitForChild("leaderstats")
 	local cash = stats:WaitForChild("Cash")
 	local income = stats:WaitForChild("Income")
 	local rebirths = stats:WaitForChild("Rebirths")
 	local function refresh()
-		cashLabel.Text = "Cash: $" .. cash.Value
-		incomeLabel.Text = "Income: $" .. income.Value .. "/s"
+		cashLabel.Text = "Cash: " .. formatCash(cash.Value)
+		incomeLabel.Text = "Income: " .. formatCash(income.Value) .. "/s"
 		rebirthLabel.Text = "Rebirths: " .. rebirths.Value
 	end
 	cash.Changed:Connect(refresh)
@@ -109,15 +120,29 @@ remotes.Notify.OnClientEvent:Connect(function(text)
 	alertUntil = os.clock() + 6
 end)
 
+-- Generation guard: every warning bumps the token, and only the
+-- loop holding the newest token keeps writing the banner. Two
+-- warnings in a row can never spawn two fighting countdown loops.
+local waveGeneration = 0
 remotes.WaveWarning.OnClientEvent:Connect(function(secondsLeft)
+	waveGeneration += 1
+	local myGeneration = waveGeneration
 	waveLabel.Visible = true
 	for left = secondsLeft, 1, -1 do
+		if myGeneration ~= waveGeneration then
+			return
+		end
 		waveLabel.Text = "BRAINROT WAVE IN " .. left .. "s - GET TO YOUR BASE!"
 		task.wait(1)
 	end
+	if myGeneration ~= waveGeneration then
+		return
+	end
 	waveLabel.Text = "THE WAVE IS HERE!"
 	task.wait(3)
-	waveLabel.Visible = false
+	if myGeneration == waveGeneration then
+		waveLabel.Visible = false
+	end
 end)
 
 -- The help line fades back after an alert has been on screen a while.

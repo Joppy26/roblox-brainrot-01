@@ -1,8 +1,8 @@
--- Brainrot Rush 3D: the cast. Every character is assembled from Parts
--- in code, so the whole cast lives in src/ and the place is fully
--- reproducible from the repo. Characters walk the conveyor, wear a
--- billboard with name, rarity and $/s, and can be bought, stolen or
--- carried home.
+-- Brainrot Rush 3D: the cast. Every character is assembled from
+-- Parts in code, so the whole cast lives in src/ and the place is
+-- fully reproducible from the repo. Characters walk the conveyor,
+-- wear a billboard with name, rarity and $/s, and can be bought,
+-- stolen or carried home.
 
 local Config = require(script.Parent.Config)
 
@@ -152,9 +152,9 @@ end
 -- The floating label every character wears: name, rarity colour,
 -- mutation and money per second, readable from across the arena.
 -- The three lines are named, so other modules can find the rate
--- line by name instead of guessing by colour.
--- The offset sits above the tallest model (Lirili tops out near
--- 5.4 studs), so the label never clips into a head.
+-- line by name instead of guessing by colour. The offset sits above
+-- the tallest model (Lirili tops out near 5.4 studs), so the label
+-- never clips into a head.
 local function buildBillboard(model, root, def, mutation)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Label"

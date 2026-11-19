@@ -1,12 +1,11 @@
--- Brainrot Rush 3D: the single source of tuning and the cast.
--- Every other server module requires this file, so prices, rates,
--- rarities and geometry all live in one place. The client never
--- decides a number; it only shows what the server says.
+-- Brainrot Rush 3D: the tuning bible.
+-- Every number the game runs on lives here: arena size, the cast,
+-- rarities, mutation odds, rebirth rules, steal and wave timing.
+-- The client never picks a number; it only draws what the server says.
 
 local Config = {}
 
--- The arena. The conveyor lane runs along X at Z = 0, west to east.
--- Four bases sit in the corners of the square.
+-- Geometry of the arena. The lane runs east along X at Z = 0.
 Config.ARENA_HALF = 96
 Config.LANE_Z = 0
 Config.LANE_HALF_WIDTH = 6
@@ -18,8 +17,8 @@ Config.MAX_CONVEYOR = 12
 Config.PADS_PER_BASE = 6
 Config.MAX_BASES = 4
 
--- Rarities in ladder order. color paints billboards, stalls and
--- base signs; weight is the spawn chance out of the total.
+-- The rarity ladder, cheapest first. color paints billboards, shop
+-- awnings and base signs; weight is the spawn chance out of 100.
 Config.RARITIES = {
 	{ name = "Common", color = Color3.fromRGB(170, 170, 170), weight = 40 },
 	{ name = "Rare", color = Color3.fromRGB(80, 160, 255), weight = 28 },
@@ -29,8 +28,8 @@ Config.RARITIES = {
 	{ name = "Secret", color = Color3.fromRGB(255, 235, 60), weight = 2 },
 }
 
--- The cast. price is the buy cost, rate is cash per second, build
--- names the builder function in Characters.
+-- The cast. price is what a buy costs, rate is cash per second,
+-- build names the builder in Characters.
 Config.CHARACTERS = {
 	{ name = "Tung Tung Sahur", rarity = "Common", price = 25, rate = 1, build = "TungTung" },
 	{ name = "Chimpanzini Bananini", rarity = "Rare", price = 150, rate = 5, build = "Chimpanzini" },
@@ -40,31 +39,31 @@ Config.CHARACTERS = {
 	{ name = "Lirili Larila", rarity = "Secret", price = 20000, rate = 400, build = "Lirili" },
 }
 
--- Mutations rolled when a character is bought. name is shown on the
--- billboard, mult multiplies the income, chance sums to 1.
+-- Mutations rolled on the server when a character is bought.
+-- name is printed on the billboard, mult multiplies its income.
 Config.MUTATIONS = {
 	{ name = "", mult = 1, chance = 0.87 },
 	{ name = "Gold", mult = 2, chance = 0.10 },
 	{ name = "Rainbow", mult = 5, chance = 0.03 },
 }
 
--- Rebirth needs this much total income per second. It wipes cash and
--- owned characters for a permanent +25% income per rebirth.
+-- Rebirth: wipe cash and owned characters for a permanent income
+-- bonus. It unlocks once total income reaches this many $/s.
 Config.REBIRTH_INCOME_NEEDED = 100
 Config.REBIRTH_BONUS = 0.25
 Config.START_CASH = 100
 
--- Stealing and slapping.
+-- Stealing, slapping and the anti-exploit reach checks.
 Config.CARRY_SPEED = 10
 Config.NORMAL_SPEED = 16
 Config.SLAP_RANGE = 9
 Config.SLAP_COOLDOWN = 3
 Config.STEAL_COOLDOWN = 5
--- Anti-exploit: how close a player must stand to buy or steal.
 Config.BUY_RANGE = 20
 Config.STEAL_RANGE = 12
 
--- The Brainrot Wave: warning, then a wall sweeps across the lane.
+-- The Brainrot Wave: how often, how long the warning, how long
+-- the wall takes to cross the arena.
 Config.WAVE_PERIOD = 180
 Config.WAVE_WARNING = 20
 Config.WAVE_SWEEP_TIME = 10
@@ -93,10 +92,10 @@ function Config.rollRarity()
 		total += r.weight
 	end
 	local roll = math.random(1, total)
-	local running = 0
+	local soFar = 0
 	for _, r in ipairs(Config.RARITIES) do
-		running += r.weight
-		if roll <= running then
+		soFar += r.weight
+		if roll <= soFar then
 			return r.name
 		end
 	end
@@ -105,10 +104,10 @@ end
 
 function Config.rollMutation()
 	local roll = math.random()
-	local running = 0
+	local soFar = 0
 	for _, m in ipairs(Config.MUTATIONS) do
-		running += m.chance
-		if roll <= running then
+		soFar += m.chance
+		if roll <= soFar then
 			return m
 		end
 	end
@@ -125,17 +124,17 @@ function Config.characterOfRarity(rarityName)
 	return pool[math.random(1, #pool)]
 end
 
--- One place for money formatting, so every notify, billboard and
--- HUD line spells cash the same way: $1,250 instead of $1250.
+-- Every cash figure in the game is spelled the same way through
+-- this helper: $1,250, never $1250.
 function Config.formatCash(amount)
 	local n = math.floor(amount)
-	local text = tostring(n)
-	local out = ""
-	while #text > 3 do
-		out = "," .. text:sub(-3) .. out
-		text = text:sub(1, -4)
+	local digits = tostring(n)
+	local grouped = ""
+	while #digits > 3 do
+		grouped = "," .. digits:sub(-3) .. grouped
+		digits = digits:sub(1, -4)
 	end
-	return "$" .. text .. out
+	return "$" .. digits .. grouped
 end
 
 return Config
